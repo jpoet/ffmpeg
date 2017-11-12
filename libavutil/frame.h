@@ -52,8 +52,39 @@ enum AVFrameSideDataType {
     AV_FRAME_DATA_PANSCAN,
     /**
      * ATSC A53 Part 4 Closed Captions.
-     * A53 CC bitstream is stored as uint8_t in AVFrameSideData.data.
+     * A53 CC bitstream (cc_data) is stored as uint8_t in AVFrameSideData.data.
      * The number of bytes of CC data is AVFrameSideData.size.
+     *
+     * Data format:
+     *
+     * bslbf -- Bit string, left bit first, where “left” is the order in
+     * which bit strings are written in the Standard. Bit strings are
+     * written as a string of 1s and 0s within single quote marks,
+     * e.g. ‘1000 0001’. Blanks within a bit string are for ease of
+     * reading and have no significance
+     *
+     * uimsbf -- Unsigned integer, most significant bit first.
+     *
+     * cc_data() {
+     *     reserved (1 bits) ’1’
+     *     process_cc_data_flag  (1 bits) bslbf
+     *     additional_data_flag  (1 bits) bslbf
+     *     cc_count              (5 bits) uimsbf
+     *     reserved              (8 bits) ‘1111 1111’
+     *     for (i=0 ; i < cc_count ; ++i) {
+     *         marker_bits (5 bits) ‘1111 1’
+     *         cc_valid    (1 bits) bslbf
+     *         cc_type     (2 bits) bslbf
+     *         cc_data_1   (8 bits) bslbf
+     *         cc_data_2   (8 bits) bslbf
+     *     }
+     *     marker_bits     (8 bits) ‘1111 1111’
+     *     if (additional_data_flag) {
+     *         while (nextbits() != ‘0000 0000 0000 0000 0000 0001’) {
+     *             additional_cc_data
+     *         }
+     *     }
+     * }
      */
     AV_FRAME_DATA_A53_CC,
     /**
@@ -768,6 +799,11 @@ AVFrameSideData *av_frame_new_side_data(AVFrame *frame,
  */
 AVFrameSideData *av_frame_get_side_data(const AVFrame *frame,
                                         enum AVFrameSideDataType type);
+/**
+ * @return a pointer to the side data at the given index on success,
+ * NULL if the index is out-of-bounds.
+ */
+AVFrameSideData *av_frame_get_side_data_at(const AVFrame *frame, int idx);
 
 /**
  * If side data of the supplied type exists in the frame, free it and remove it

@@ -543,6 +543,58 @@ void ff_mpeg1_encode_picture_header(MpegEncContext *s, int picture_number)
         }
     }
 
+    /* MPEG closed caption user data is limited to 31 3-byte "closed
+     * caption constructs" per user data block.  There can be serveral
+     * such user data blocks per frame.
+     */
+    for (int i = 0;; ++i) {
+        side_data = av_frame_get_side_data_at(s->current_picture_ptr->f, i);
+        if (!side_data)
+            break;
+
+        if (side_data->type == AV_FRAME_DATA_A53_CC) {
+            avpriv_align_put_bits(&s->pb);
+            put_header(s, USER_START_CODE);
+
+            /* ATSC user data identifier for CC or BAR data */
+            put_bits(&s->pb, 8, 'G');
+            put_bits(&s->pb, 8, 'A');
+            put_bits(&s->pb, 8, '9');
+            put_bits(&s->pb, 8, '4');
+
+            /* MPEG CC data type code */
+            put_bits(&s->pb, 8, 0x03);
+
+            /* cc_data() {
+             *     reserved (1 bits) ’1’
+             *     process_cc_data_flag  (1 bits) bslbf
+             *     additional_data_flag  (1 bits) bslbf
+             *     cc_count              (5 bits) uimsbf
+             *     reserved              (8 bits) ‘1111 1111’
+             *     for (i=0 ; i < cc_count ; ++i) {
+             *         marker_bits (5 bits) ‘1111 1’
+             *         cc_valid    (1 bits) bslbf
+             *         cc_type     (2 bits) bslbf
+             *         cc_data_1   (8 bits) bslbf
+             *         cc_data_2   (8 bits) bslbf
+             *     }
+             *     marker_bits     (8 bits) ‘1111 1111’
+             *     if (additional_data_flag) {
+             *         while (nextbits() != ‘0000 0000 0000 0000 0000 0001’) {
+             *             additional_cc_data
+             *         }
+             *     }
+             * }
+             */
+            for(int j = 0; j < side_data->size; ++j) {
+                put_bits(&s->pb, 8, side_data->data[j]);
+            }
+
+            /* Marker bits */
+            put_bits(&s->pb, 8, 0xFF);
+        }
+    }
+
     s->mb_y = 0;
     ff_mpeg1_encode_slice_header(s);
 }

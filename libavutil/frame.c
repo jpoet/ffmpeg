@@ -691,6 +691,14 @@ AVFrameSideData *av_frame_get_side_data(const AVFrame *frame,
     return NULL;
 }
 
+AVFrameSideData *av_frame_get_side_data_at(const AVFrame *frame, int idx)
+{
+    if (idx < frame->nb_side_data)
+        return frame->side_data[idx];
+
+  return NULL;
+}
+
 static int frame_copy_video(AVFrame *dst, const AVFrame *src)
 {
     const uint8_t *src_data[4];
